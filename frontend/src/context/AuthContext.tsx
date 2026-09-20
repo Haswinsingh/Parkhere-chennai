@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (identifier: string, password: string, role?: string) => Promise<User>;
-  register: (formData: FormData) => Promise<User>;
+  register: (formData: FormData | Record<string, any>) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -48,9 +48,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     try {
       const res = await authService.getMe();
-      if (res.success && res.data?.user) {
-        setUser(res.data.user);
-        localStorage.setItem('parkhere_user', JSON.stringify(res.data.user));
+      const currentUser = res.data?.user || (res as any).user;
+      if (res.success && currentUser) {
+        setUser(currentUser);
+        localStorage.setItem('parkhere_user', JSON.stringify(currentUser));
       }
     } catch {
       setUser(null);
@@ -74,8 +75,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     try {
       const res = await authService.login({ identifier, password, role });
-      if (res.success && res.data) {
-        const { token: newToken, user: newUser } = res.data;
+      const responseData = res.data || (res as any);
+      const newToken = responseData?.token || (res as any).token;
+      const newUser = responseData?.user || (res as any).user;
+
+      if (res.success && newToken && newUser) {
         setToken(newToken);
         setUser(newUser);
         localStorage.setItem('parkhere_token', newToken);
@@ -88,12 +92,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (formData: FormData): Promise<User> => {
+  const register = async (formData: FormData | Record<string, any>): Promise<User> => {
     setIsLoading(true);
     try {
       const res = await authService.register(formData);
-      if (res.success && res.data) {
-        const { token: newToken, user: newUser } = res.data;
+      const responseData = res.data || (res as any);
+      const newToken = responseData?.token || (res as any).token;
+      const newUser = responseData?.user || (res as any).user;
+
+      if (res.success && newToken && newUser) {
         setToken(newToken);
         setUser(newUser);
         localStorage.setItem('parkhere_token', newToken);

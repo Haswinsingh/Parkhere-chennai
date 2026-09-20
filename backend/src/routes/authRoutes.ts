@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, getMe, logout } from '../controllers/authController';
+import { register, login, getCurrentUser, logout } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 import { uploadPrivate } from '../middleware/upload';
 
@@ -16,7 +16,7 @@ router.post(
 );
 
 router.post('/login', login);
-router.get('/me', authenticate, getMe);
 router.post('/logout', logout);
+router.get('/me', authenticate, getCurrentUser);
 
 export default router;

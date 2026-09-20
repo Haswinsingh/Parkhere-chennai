@@ -13,6 +13,26 @@ const generateToken = (user: IUser): string => {
   );
 };
 
+export const sanitizeUser = (user: any) => {
+  const userObj = user.toJSON ? user.toJSON() : { ...user };
+  delete userObj.passwordHash;
+  delete userObj.password;
+  delete userObj.__v;
+  if (!userObj.id && userObj._id) {
+    userObj.id = userObj._id.toString();
+  }
+  return userObj;
+};
+
+const setTokenCookie = (res: Response, token: string) => {
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  });
+};
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
@@ -42,10 +62,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (password !== confirmPassword) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.toLowerCase().trim())) {
       res.status(400).json({
         success: false,
-        message: 'Passwords do not match.',
+        message: 'Please provide a valid email address.',
       });
       return;
     }
@@ -54,6 +75,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({
         success: false,
         message: 'Password must be at least 6 characters long.',
+      });
+      return;
+    }
+
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      res.status(400).json({
+        success: false,
+        message: 'Passwords do not match.',
       });
       return;
     }
@@ -85,65 +114,30 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Role-specific enforcement for Parking Holder
+    // Role-specific handling for Parking Holder
     let idDocumentData: any = undefined;
     const uploadedFiles = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
     if (assignedRole === 'parking_holder') {
-      // Compulsory Section A
-      if (!numberOfVehicles || !parkingPreference || !securityPreference) {
-        res.status(400).json({
-          success: false,
-          message: 'Parking Holder signup requires Section A preferences: number of vehicles, parking preference, and security preference.',
-        });
-        return;
-      }
-
-      // Compulsory Section B
-      if (!landmark) {
-        res.status(400).json({
-          success: false,
-          message: 'A landmark is compulsory for host verification.',
-        });
-        return;
-      }
-
-      // Government ID upload is compulsory
       const idDocFile = uploadedFiles?.['idDocument']?.[0];
-      if (!idDocFile) {
-        res.status(400).json({
-          success: false,
-          message: 'Government ID document (Aadhaar / ID) is compulsory for host verification.',
-        });
-        return;
-      }
-
-      idDocumentData = {
-        filename: idDocFile.filename,
-        originalName: idDocFile.originalname,
-        path: idDocFile.path,
-        mimeType: idDocFile.mimetype,
-        uploadedAt: new Date(),
-      };
-
-      // Compulsory Parking Photos (at least 2 photos)
-      const parkingPhotoFiles = uploadedFiles?.['photos'] || [];
-      if (parkingPhotoFiles.length < 2) {
-        res.status(400).json({
-          success: false,
-          message: 'At least 2 parking photos are required for host verification.',
-        });
-        return;
+      if (idDocFile) {
+        idDocumentData = {
+          filename: idDocFile.filename,
+          originalName: idDocFile.originalname,
+          path: idDocFile.path,
+          mimeType: idDocFile.mimetype,
+          uploadedAt: new Date(),
+        };
       }
     }
 
-    // Hash password
+    // Hash password with 12 salt rounds
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
     const parkingPhotoFilenames = (uploadedFiles?.['photos'] || []).map((f) => f.filename);
 
-    // Create user
+    // Create user in database
     const newUser = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
@@ -153,11 +147,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       isActive: true,
       verificationStatus: assignedRole === 'parking_holder' ? 'pending' : undefined,
       hostPreferences:
-        assignedRole === 'parking_holder'
+        assignedRole === 'parking_holder' && (numberOfVehicles || parkingPreference || securityPreference)
           ? {
-              numberOfVehicles: Number(numberOfVehicles),
-              parkingPreference,
-              securityPreference,
+              numberOfVehicles: numberOfVehicles ? Number(numberOfVehicles) : 1,
+              parkingPreference: parkingPreference || 'Covered',
+              securityPreference: securityPreference || 'Both',
             }
           : undefined,
       idDocument: idDocumentData,
@@ -169,13 +163,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     const token = generateToken(newUser);
+    setTokenCookie(res, token);
+    const sanitized = sanitizeUser(newUser);
 
     res.status(201).json({
       success: true,
       message: 'Account created successfully.',
+      token,
+      user: sanitized,
       data: {
         token,
-        user: newUser,
+        user: sanitized,
       },
     });
   } catch (err: any) {
@@ -189,23 +187,22 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { identifier, password, role } = req.body;
+    const identifier = (req.body.identifier || req.body.email || '').trim();
+    const { password, role } = req.body;
 
     if (!identifier || !password) {
       res.status(400).json({
         success: false,
-        message: 'Please provide your email/phone and password.',
+        message: 'Please provide your email or phone and password.',
       });
       return;
     }
 
-    const cleanIdentifier = identifier.trim();
-
     // Query by email (case-insensitive) or phone
     const user = await User.findOne({
       $or: [
-        { email: cleanIdentifier.toLowerCase() },
-        { phone: cleanIdentifier },
+        { email: identifier.toLowerCase() },
+        { phone: identifier },
       ],
     });
 
@@ -248,13 +245,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = generateToken(user);
+    setTokenCookie(res, token);
+    const sanitized = sanitizeUser(user);
 
     res.status(200).json({
       success: true,
       message: 'Logged in successfully.',
+      token,
+      user: sanitized,
       data: {
         token,
-        user,
+        user: sanitized,
       },
     });
   } catch (err: any) {
@@ -266,20 +267,25 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const getCurrentUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (!req.user) {
       res.status(401).json({
         success: false,
         message: 'Not authenticated.',
+        code: 'UNAUTHORIZED',
       });
       return;
     }
 
+    const sanitized = sanitizeUser(req.user);
+
     res.status(200).json({
       success: true,
+      message: 'Current user profile retrieved.',
+      user: sanitized,
       data: {
-        user: req.user,
+        user: sanitized,
       },
     });
   } catch (err: any) {
@@ -290,9 +296,23 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
   }
 };
 
+export const getMe = getCurrentUser;
+
 export const logout = async (_req: Request, res: Response): Promise<void> => {
-  res.status(200).json({
-    success: true,
-    message: 'Signed out successfully.',
-  });
+  try {
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+    res.status(200).json({
+      success: true,
+      message: 'Signed out successfully.',
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete logout.',
+    });
+  }
 };
