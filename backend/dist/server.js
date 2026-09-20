@@ -60,6 +60,16 @@ app.use('/api/*', (req, res) => {
 });
 // Global sanitized error handler
 app.use(errorHandler_1.errorHandler);
+// Ensure database connection for serverless invocations
+app.use(async (_req, _res, next) => {
+    try {
+        await (0, db_1.connectDB)();
+    }
+    catch (err) {
+        console.error('Serverless database connection error:', err);
+    }
+    next();
+});
 // Start server
 const startServer = async () => {
     try {
@@ -81,5 +91,8 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-startServer();
+// If running in local dev, VPS, or container (Render/Railway), start HTTP listener
+if (process.env.VERCEL !== '1') {
+    startServer();
+}
 exports.default = app;

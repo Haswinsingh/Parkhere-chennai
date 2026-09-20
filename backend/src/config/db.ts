@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 import { ENV } from './env';
 
 export const connectDB = async (): Promise<void> => {
+  // Reuse existing database connection if already connected (Serverless optimization)
+  if (mongoose.connection.readyState >= 1) {
+    return;
+  }
+
   try {
     // Attempt connecting to the configured MONGODB_URI
     mongoose.set('strictQuery', true);

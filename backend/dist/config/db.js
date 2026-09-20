@@ -40,6 +40,10 @@ exports.connectDB = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const env_1 = require("./env");
 const connectDB = async () => {
+    // Reuse existing database connection if already connected (Serverless optimization)
+    if (mongoose_1.default.connection.readyState >= 1) {
+        return;
+    }
     try {
         // Attempt connecting to the configured MONGODB_URI
         mongoose_1.default.set('strictQuery', true);

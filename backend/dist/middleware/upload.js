@@ -7,17 +7,25 @@ exports.PRIVATE_UPLOAD_PATH = exports.PUBLIC_UPLOAD_PATH = exports.uploadPrivate
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-const BASE_UPLOAD_PATH = path_1.default.resolve(__dirname, '../../uploads');
+// Use /tmp on Vercel serverless environment (read-only filesystem workaround)
+const BASE_UPLOAD_PATH = process.env.VERCEL === '1'
+    ? '/tmp/uploads'
+    : path_1.default.resolve(__dirname, '../../uploads');
 const PUBLIC_UPLOAD_PATH = path_1.default.join(BASE_UPLOAD_PATH, 'public');
 exports.PUBLIC_UPLOAD_PATH = PUBLIC_UPLOAD_PATH;
 const PRIVATE_UPLOAD_PATH = path_1.default.join(BASE_UPLOAD_PATH, 'private');
 exports.PRIVATE_UPLOAD_PATH = PRIVATE_UPLOAD_PATH;
 // Ensure directories exist
-if (!fs_1.default.existsSync(PUBLIC_UPLOAD_PATH)) {
-    fs_1.default.mkdirSync(PUBLIC_UPLOAD_PATH, { recursive: true });
+try {
+    if (!fs_1.default.existsSync(PUBLIC_UPLOAD_PATH)) {
+        fs_1.default.mkdirSync(PUBLIC_UPLOAD_PATH, { recursive: true });
+    }
+    if (!fs_1.default.existsSync(PRIVATE_UPLOAD_PATH)) {
+        fs_1.default.mkdirSync(PRIVATE_UPLOAD_PATH, { recursive: true });
+    }
 }
-if (!fs_1.default.existsSync(PRIVATE_UPLOAD_PATH)) {
-    fs_1.default.mkdirSync(PRIVATE_UPLOAD_PATH, { recursive: true });
+catch (dirErr) {
+    console.warn('Could not initialize local upload folders:', dirErr);
 }
 // Allowed MIME types
 const ALLOWED_MIME_TYPES = [
