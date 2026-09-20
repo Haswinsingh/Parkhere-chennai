@@ -33,6 +33,26 @@ app.use((0, cors_1.default)({
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
+// Root welcome & status endpoint
+app.get('/', (_req, res) => {
+    res.status(200).json({
+        status: 'online',
+        name: 'ParkHere Backend API',
+        tagline: 'Smart Parking for Smarter Cities',
+        environment: env_1.ENV.NODE_ENV,
+        database: 'MongoDB Atlas Connected',
+        endpoints: {
+            health: '/api/health',
+            auth: '/api/auth',
+            parking: '/api/parking',
+            bookings: '/api/bookings',
+            payments: '/api/payments',
+            notifications: '/api/notifications',
+            verification: '/api/verification',
+        },
+        message: 'ParkHere Backend API is live and healthy.',
+    });
+});
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
     res.status(200).json({
@@ -51,7 +71,7 @@ app.use('/api/users', userRoutes_1.default);
 app.use('/api/verification', verificationRoutes_1.default);
 app.use('/api/media', mediaRoutes_1.default);
 // Fallback 404 for undefined routes
-app.use('/api/*', (req, res) => {
+app.use('*', (req, res) => {
     res.status(404).json({
         success: false,
         message: `Endpoint not found: ${req.method} ${req.originalUrl}`,
