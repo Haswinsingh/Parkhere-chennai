@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { User, IUser, UserRole } from '../models/User';
 import { ENV } from '../config/env';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { connectDB } from '../config/db';
 
 const generateToken = (user: IUser): string => {
   return jwt.sign(
@@ -35,6 +36,7 @@ const setTokenCookie = (res: Response, token: string) => {
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
+    await connectDB();
     const {
       name,
       email,
@@ -187,6 +189,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
+    await connectDB();
     const identifier = (req.body.identifier || req.body.email || '').trim();
     const { password, role } = req.body;
 
@@ -269,6 +272,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 export const getCurrentUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    await connectDB();
     if (!req.user) {
       res.status(401).json({
         success: false,

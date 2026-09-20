@@ -7,6 +7,10 @@ const getApiBaseUrl = (): string => {
     const trimmed = envUrl.trim().replace(/\/+$/, '');
     return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
   }
+  // In production builds, default directly to the live production backend
+  if ((import.meta as any).env?.PROD) {
+    return 'https://parkhere-chennai.vercel.app/api';
+  }
   return 'http://localhost:5000/api';
 };
 
@@ -24,8 +28,8 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // If request URL starts with /api/, strip it since baseURL already ends with /api
-    if (config.url?.startsWith('/api/')) {
-      config.url = config.url.substring(4); // removes leading '/api' leaving '/...'
+    if (config.url) {
+      config.url = config.url.replace(/^\/?api\//, '/');
     }
 
     const token = localStorage.getItem('parkhere_token');

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { ENV } from '../config/env';
 import { User, IUser } from '../models/User';
+import { connectDB } from '../config/db';
 
 export interface AuthenticatedRequest extends Request {
   user?: IUser;
@@ -36,6 +37,7 @@ export const authenticate = async (
     }
 
     const decoded = jwt.verify(token, ENV.JWT_SECRET) as JwtPayload;
+    await connectDB();
     const user = await User.findById(decoded.id);
 
     if (!user || !user.isActive) {

@@ -100,15 +100,16 @@ export const SignUpPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const formData = new FormData();
-      formData.append('name', name.trim());
-      formData.append('email', email.trim().toLowerCase());
-      formData.append('phone', phone.trim());
-      formData.append('password', password);
-      formData.append('confirmPassword', confirmPassword);
-      formData.append('role', selectedRole || 'parking_needed');
+      let user;
 
       if (selectedRole === 'parking_holder') {
+        const formData = new FormData();
+        formData.append('name', name.trim());
+        formData.append('email', email.trim().toLowerCase());
+        formData.append('phone', phone.trim());
+        formData.append('password', password);
+        formData.append('confirmPassword', confirmPassword);
+        formData.append('role', 'parking_holder');
         formData.append('numberOfVehicles', numberOfVehicles.toString());
         formData.append('parkingPreference', parkingPreference);
         formData.append('securityPreference', securityPreference);
@@ -119,13 +120,21 @@ export const SignUpPage: React.FC = () => {
 
         if (idDocumentFile) formData.append('idDocument', idDocumentFile);
         parkingPhotos.forEach((photo) => formData.append('photos', photo));
-      }
 
-      const user = await register(formData);
-
-      if (user.role === 'parking_holder') {
+        user = await register(formData);
         navigate('/parking-holder/verification');
       } else {
+        // Pure JSON payload for parking_needed driver registration
+        const payload = {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+          password,
+          confirmPassword,
+          role: 'parking_needed',
+        };
+
+        user = await register(payload);
         navigate('/parking-needed');
       }
     } catch (err: any) {

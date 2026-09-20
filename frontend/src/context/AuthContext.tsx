@@ -42,16 +42,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const refreshUser = async () => {
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
     try {
       const res = await authService.getMe();
       const currentUser = res.data?.user || (res as any).user;
       if (res.success && currentUser) {
         setUser(currentUser);
         localStorage.setItem('parkhere_user', JSON.stringify(currentUser));
+        return;
       }
     } catch {
       setUser(null);
@@ -65,7 +62,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     refreshUser();
-  }, [token]);
+  }, []);
 
   const login = async (
     identifier: string,
@@ -132,7 +129,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         user,
         token,
         role: user?.role || null,
-        isAuthenticated: !!user && !!token,
+        isAuthenticated: !!user,
         isLoading,
         login,
         register,

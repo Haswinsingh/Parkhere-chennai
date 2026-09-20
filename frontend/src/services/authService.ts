@@ -20,9 +20,18 @@ export const authService = {
     password: string;
     role?: string;
   }): Promise<ApiResponse<{ token: string; user: User }>> {
+    const emailVal = (payload.email || payload.identifier || '').trim();
+    const body: Record<string, any> = {
+      email: emailVal,
+      identifier: emailVal,
+      password: payload.password,
+    };
+    if (payload.role) {
+      body.role = payload.role;
+    }
     const res = await api.post<ApiResponse<{ token: string; user: User }>>(
       '/api/auth/login',
-      payload
+      body
     );
     return res.data;
   },
