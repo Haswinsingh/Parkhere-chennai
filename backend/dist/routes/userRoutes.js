@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const userController_1 = require("../controllers/userController");
+const auth_1 = require("../middleware/auth");
+const upload_1 = require("../middleware/upload");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/me', userController_1.getProfile);
+router.patch('/me', upload_1.uploadPublic.single('profileImage'), userController_1.updateProfile);
+router.post('/change-password', userController_1.changePassword);
+exports.default = router;
